@@ -169,13 +169,13 @@
     }
 
     async function loadModels(kind) {
-        const key = apiKey();
-        if (!key) return setStatus('Enter and save your NanoGPT API key before loading models.', true);
         const button = rootElement()?.querySelector(`.ngsi-load-${kind}-models`);
         if (button) { button.disabled = true; button.textContent = 'Loading…'; }
         try {
             const path = kind === 'image' ? '/api/v1/image-models?detailed=true' : '/api/v1/models?detailed=true';
-            const response = await fetch(apiUrl(path), { headers: { 'Authorization': `Bearer ${key}` } });
+            // NanoGPT model catalogs are public. Avoid Authorization here: it forces a CORS
+            // preflight from browsers and is not needed to list model IDs.
+            const response = await fetch(apiUrl(path), { method: 'GET' });
             const raw = await response.text();
             let data;
             try { data = raw ? JSON.parse(raw) : {}; } catch { data = { message: raw }; }
@@ -191,7 +191,10 @@
             filterModelPicker(kind, rootElement().querySelector(`.ngsi-${kind}-search`).value);
             setStatus(`Loaded ${modelCatalogs[kind].length} ${kind} models. Search by name or model ID and select a result.`);
         } catch (error) {
-            setStatus(`Could not load ${kind} models: ${error.message}. You can still type a model ID manually.`, true);
+            const detail = error instanceof TypeError
+                ? `The browser could not reach ${apiUrl(kind === 'image' ? '/api/v1/image-models?detailed=true' : '/api/v1/models?detailed=true')}. Check the API host, connection, or whether SillyTavern's origin is allowed by NanoGPT CORS.`
+                : error.message;
+            setStatus(`Could not load ${kind} models: ${detail} You can still type a model ID manually.`, true);
         } finally {
             if (button) { button.disabled = false; button.textContent = `Load ${kind} models`; }
         }
