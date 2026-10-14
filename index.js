@@ -11,6 +11,7 @@
         textModel: 'minimax/minimax-m2.7',
         recentMessages: 6,
         includeAppearance: true,
+        includePortraits: true,
         resolution: '1024x1024',
         imageQuality: '',
         referenceIds: [],
@@ -113,6 +114,8 @@
               <label class="ngsi-field">Image size / resolution <input class="text_pole ngsi-resolution" value="${escapeHtml(current.resolution)}" placeholder="Model-specific, e.g. 1024x1024 or 1k"></label></div>
               <label class="ngsi-field">Optional image quality <input class="text_pole ngsi-quality" value="${escapeHtml(current.imageQuality)}" placeholder="Leave blank unless your model supports it"></label>
               <label class="ngsi-check"><input class="ngsi-appearance" type="checkbox" ${current.includeAppearance ? 'checked' : ''}> Include current character/group appearance and description automatically</label>
+              <label class="ngsi-check"><input class="ngsi-portraits" type="checkbox" ${current.includePortraits ? 'checked' : ''}> Send active character/group portrait(s) as visual references</label>
+              <small class="ngsi-help">Uses the character portrait assigned in SillyTavern. Portraits are resized in your browser and sent to NanoGPT with the image request.</small>
               <label class="ngsi-field">Extra direction for this image <textarea class="text_pole ngsi-prompt" rows="3" placeholder="Optional framing, mood, style, or specific moment…"></textarea></label>
               <div class="ngsi-divider"></div>
               <b>Named reference images</b>
@@ -141,6 +144,7 @@
         $('.ngsi-resolution').addEventListener('change', e => update('resolution', e.target.value.trim()));
         $('.ngsi-quality').addEventListener('change', e => update('imageQuality', e.target.value.trim()));
         $('.ngsi-appearance').addEventListener('change', e => update('includeAppearance', e.target.checked));
+        $('.ngsi-portraits').addEventListener('change', e => update('includePortraits', e.target.checked));
         $('.ngsi-add-ref').addEventListener('click', addReference);
         $('.ngsi-generate').addEventListener('click', generateAndInsert);
         refreshReferenceList();
@@ -206,8 +210,7 @@
         }
     }
 
-    function currentCharacterDetails(ctx) {
-        if (!settings().includeAppearance) return '';
+    function relevantCharacters(ctx) {
         const relevant = [];
         if (ctx.characterId >= 0 && ctx.characters?.[ctx.characterId]) relevant.push(ctx.characters[ctx.characterId]);
         const group = ctx.groupId >= 0 ? ctx.groups?.[ctx.groupId] : null;
@@ -217,6 +220,52 @@
                 if (found && !relevant.includes(found)) relevant.push(found);
             }
         }
+        return relevant;
+    }
+
+    async function loadPortraitReference(character) {
+        const avatar = character?.avatar;
+        if (!avatar || avatar === 'none' || avatar === 'default') return null;
+        const path = `/characters/${encodeURIComponent(avatar)}`;
+        const response = await fetch(new URL(path, window.location.origin), { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`Avatar request returned HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) throw new Error('SillyTavern did not return an image for this avatar');
+        const bitmap = await createImageBitmap(blob);
+        const maxEdge = 1024;
+        const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const canvasContext = canvas.getContext('2d');
+        canvasContext.fillStyle = '#ffffff';
+        canvasContext.fillRect(0, 0, canvas.width, canvas.height);
+        canvasContext.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        return {
+            name: `${character.name || 'Character'} — SillyTavern portrait`,
+            dataUrl: canvas.toDataURL('image/jpeg', 0.9),
+        };
+    }
+
+    async function loadCharacterPortraits(characters) {
+        const results = await Promise.all(characters.map(async character => {
+            try {
+                return await loadPortraitReference(character);
+            } catch (error) {
+                console.warn(`[NanoGPT Inline Scene Images] Could not load ${character?.name || 'character'} portrait:`, error);
+                return { warning: `${character?.name || 'Character'} portrait could not be loaded` };
+            }
+        }));
+        return {
+            references: results.filter(result => result?.dataUrl),
+            warnings: results.filter(result => result?.warning).map(result => result.warning),
+        };
+    }
+
+    function currentCharacterDetails(ctx) {
+        if (!settings().includeAppearance) return '';
+        const relevant = relevantCharacters(ctx);
         return relevant.map(ch => {
             const data = ch.data || ch;
             const fields = [
@@ -302,6 +351,13 @@
         setBusy(true);
         try {
             const refs = [];
+            const characterSet = relevantCharacters(ctx);
+            let portraitWarnings = [];
+            if (settings().includePortraits) {
+                const portraits = await loadCharacterPortraits(characterSet);
+                refs.push(...portraits.references);
+                portraitWarnings = portraits.warnings;
+            }
             for (const id of settings().referenceIds || []) {
                 const ref = await getReference(id);
                 if (ref?.dataUrl) refs.push(ref);
@@ -339,7 +395,9 @@
             if (typeof script.saveChatDebounced === 'function') script.saveChatDebounced();
             else if (typeof ctx.saveChat === 'function') await ctx.saveChat();
             root.querySelector('.ngsi-prompt').value = '';
-            setStatus('Image added to the current chat.');
+            setStatus(portraitWarnings.length
+                ? `Image added to the current chat. Portrait note: ${portraitWarnings.join('; ')}.`
+                : 'Image added to the current chat.');
         } catch (error) {
             console.error('[NanoGPT Inline Scene Images]', error);
             setStatus(`Could not generate image: ${error.message}`, true);

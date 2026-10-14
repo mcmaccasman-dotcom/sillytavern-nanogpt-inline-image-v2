@@ -6,6 +6,7 @@ A third-party SillyTavern UI extension that turns recent roleplay context into a
 
 - Summarizes the most recent 2–30 chat messages and writes a visual prompt with a NanoGPT text model.
 - Optionally reads the active character card's name, description, personality, and scenario. It also attempts to include group members' cards.
+- Automatically loads the active character's SillyTavern portrait (and group members' portraits where available), resizes each in the browser, and sends it as an image reference. This can be switched off in the extension settings.
 - Stores named image references in this browser's IndexedDB. Select one or more to send as image inputs; names are included as identity cues in the generated prompt.
 - Uses NanoGPT's OpenAI-compatible chat-completions API for the scene prompt and image-generation API for image output.
 - Adds the generated image to the current chat as a new assistant-style message.
@@ -23,7 +24,7 @@ A third-party SillyTavern UI extension that turns recent roleplay context into a
 
 The API key is stored in this browser profile's `localStorage` under `nanogpt_inline_scene_images_api_key`. Clear the field to remove it from this browser. Reference images are stored in browser IndexedDB and can be removed individually. Other preferences are saved using SillyTavern extension settings.
 
-When generating, the extension sends the selected recent chat text, enabled character-card details, any extra direction, chosen reference image data, and the resulting visual prompt to NanoGPT. Requests are made from the browser directly to NanoGPT. NanoGPT may charge for text and image generation. Use only content you are comfortable sending to that service.
+When generating, the extension sends the selected recent chat text, enabled character-card details, any extra direction, chosen named reference images, and active character portraits (unless portrait sending is disabled) to NanoGPT. Requests are made from the browser directly to NanoGPT. NanoGPT may charge for text and image generation. Use only content you are comfortable sending to that service.
 
 Generated images are embedded in the chat message, so chat files can become larger. This version requests base64 image output to avoid short-lived image links.
 
