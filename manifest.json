@@ -4,8 +4,8 @@
   "js": "index.js",
   "css": "style.css",
   "author": "Manus AI",
-  "version": "1.0.0",
-  "homePage": "https://github.com/mcmaccasman-dotcom/sillytavern-nanogpt-inline-image",
+  "version": "2.0.0",
+  "homePage": "https://github.com/mcmaccasman-dotcom/sillytavern-nanogpt-inline-image-v2",
   "auto_update": false,
   "minimum_client_version": "1.12.0"
 }
