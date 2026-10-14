@@ -14,11 +14,12 @@ A third-party SillyTavern UI extension that turns recent roleplay context into a
 
 ## Install
 
-1. Copy the `sillytavern-nanogpt-inline-image` folder into SillyTavern's `public/scripts/extensions/third-party/` directory. Alternatively, host this folder in a Git repository and install its repository URL through **Extensions → Install Extension**.
-2. Restart or refresh SillyTavern and enable **NanoGPT Inline Scene Images** in the Extensions panel.
-3. Paste your NanoGPT API key into the extension's password field.
-4. Set a NanoGPT image model ID and text model ID. Defaults are `hidream` for images and `minimax/minimax-m2.7` for summarization/prompt writing; change them to models enabled for your account.
-5. Optionally add named reference images, select the ones to use, and click **Generate image in chat**.
+1. Download the ZIP from the repository while signed in to GitHub, then extract the extension folder under SillyTavern's `data/<user-handle>/extensions/` directory. The final layout should look like `data/<user-handle>/extensions/sillytavern-nanogpt-inline-image/manifest.json` with `index.js` and `style.css` beside it. SillyTavern uses a per-user data folder; `<user-handle>` is the active SillyTavern user folder on your server.
+2. Restart SillyTavern (or refresh the page) and look for **NanoGPT Inline Scene Images** in **Extensions → Manage Extensions**. Enable it there; its settings drawer then appears in the Extensions settings panel.
+3. This repository is private. SillyTavern's installer may not be able to clone it directly unless the server has access to your GitHub credentials. Manual download/extraction is the reliable route. The `public/scripts/extensions/third-party/` location is for installing an extension for all users/development, not the normal per-user install.
+4. Paste your NanoGPT API key into the extension's password field.
+5. Set a NanoGPT image model ID and text model ID. Defaults are `hidream` for images and `minimax/minimax-m2.7` for summarization/prompt writing; change them to models enabled for your account.
+6. Optionally add named reference images, select the ones to use, and click **Generate image in chat**.
 
 ## Settings and data handling
 
