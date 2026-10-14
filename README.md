@@ -9,6 +9,7 @@ A third-party SillyTavern UI extension that turns recent roleplay context into a
 - Automatically loads the active character's SillyTavern portrait (and group members' portraits where available), resizes each in the browser, and sends it as an image reference. This can be switched off in the extension settings.
 - Stores named image references in this browser's IndexedDB. Select one or more to send as image inputs; names are included as identity cues in the generated prompt.
 - Uses NanoGPT's OpenAI-compatible chat-completions API for the scene prompt and image-generation API for image output.
+- Lets you set the NanoGPT API host and load/search live text and image model catalogs instead of guessing model IDs.
 - Adds the generated image to the current chat as a new assistant-style message.
 - Keeps the API key in browser `localStorage`, not in SillyTavern's extension settings JSON.
 
@@ -18,7 +19,7 @@ A third-party SillyTavern UI extension that turns recent roleplay context into a
 2. After installation completes, look for **NanoGPT Inline Scene Images** in **Extensions → Manage Extensions** and enable it. Its settings drawer then appears in the Extensions settings panel.
 3. If the installer reports that the target directory already exists, remove or rename that exact stale v2 folder from the SillyTavern server before retrying. Do not delete the v1 folder unless you intend to remove the old install.
 4. Paste your NanoGPT API key into the extension's password field.
-5. Set a NanoGPT image model ID and text model ID. Defaults are `hidream` for images and `minimax/minimax-m2.7` for summarization/prompt writing; change them to models enabled for your account.
+5. Leave the API host as `https://api.nano-gpt.com`, or enter your API host. Enter and save your NanoGPT API key, then use **Load image models** and **Load text models** to search the live catalogs. You may also paste model IDs manually. Defaults are `hidream` for images and `minimax/minimax-m2.7` for summarization/prompt writing.
 6. Optionally add named reference images, select the ones to use, and click **Generate image in chat**.
 
 ## Settings and data handling

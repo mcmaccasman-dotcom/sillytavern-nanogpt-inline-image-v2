@@ -22,6 +22,21 @@
     min-width: 0;
 }
 
+#nanogpt_inline_scene_images_root .ngsi-model-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+    padding: 0.45em;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255,255,255,.2));
+    border-radius: 0.4em;
+}
+
+#nanogpt_inline_scene_images_root .ngsi-model-box select {
+    width: 100%;
+    min-height: 5em;
+    max-height: 11em;
+}
+
 #nanogpt_inline_scene_images_root .ngsi-check,
 #nanogpt_inline_scene_images_root .ngsi-ref-row label {
     display: flex;

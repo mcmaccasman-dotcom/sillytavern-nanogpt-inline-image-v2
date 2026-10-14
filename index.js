@@ -5,8 +5,8 @@
     const API_KEY_STORAGE = 'nanogpt_inline_scene_images_api_key';
     const DB_NAME = 'nanogpt-inline-scene-images';
     const DB_STORE = 'references';
-    const API_ROOT = 'https://api.nano-gpt.com/api/v1';
     const defaults = {
+        apiBase: 'https://api.nano-gpt.com',
         imageModel: 'hidream',
         textModel: 'minimax/minimax-m2.7',
         recentMessages: 6,
@@ -108,8 +108,12 @@
             <div class="inline-drawer-content">
               <label class="ngsi-field">NanoGPT API key <input class="text_pole ngsi-api-key" type="password" autocomplete="off" placeholder="Paste your NanoGPT API key" value="${escapeHtml(apiKey())}"></label>
               <small class="ngsi-help">Saved only in this browser's local storage, not in SillyTavern extension settings.</small>
-              <div class="ngsi-row"><label class="ngsi-field">Image model <input class="text_pole ngsi-image-model" value="${escapeHtml(current.imageModel)}" placeholder="e.g. hidream or an image model ID"></label>
-              <label class="ngsi-field">Text model for summary/prompt <input class="text_pole ngsi-text-model" value="${escapeHtml(current.textModel)}" placeholder="e.g. minimax/minimax-m2.7"></label></div>
+              <label class="ngsi-field">NanoGPT API host / endpoint <input class="text_pole ngsi-api-base" type="url" value="${escapeHtml(current.apiBase)}" placeholder="https://api.nano-gpt.com"></label>
+              <small class="ngsi-help">Enter the API host, not a route. NanoGPT default: https://api.nano-gpt.com</small>
+              <div class="ngsi-model-box"><label class="ngsi-field">Search image models <input class="text_pole ngsi-image-search" type="search" placeholder="Load models, then search name or ID"></label><select class="text_pole ngsi-image-picker" size="4" aria-label="Matching image models"><option value="">Use manual model ID below</option></select><button class="menu_button ngsi-load-image-models" type="button">Load image models</button>
+              <label class="ngsi-field">Image model ID <input class="text_pole ngsi-image-model" value="${escapeHtml(current.imageModel)}" placeholder="Paste NanoGPT image model ID"></label></div>
+              <div class="ngsi-model-box"><label class="ngsi-field">Search text models (for scene summary) <input class="text_pole ngsi-text-search" type="search" placeholder="Load models, then search name or ID"></label><select class="text_pole ngsi-text-picker" size="4" aria-label="Matching text models"><option value="">Use manual model ID below</option></select><button class="menu_button ngsi-load-text-models" type="button">Load text models</button>
+              <label class="ngsi-field">Text model ID <input class="text_pole ngsi-text-model" value="${escapeHtml(current.textModel)}" placeholder="Paste NanoGPT text model ID"></label></div>
               <div class="ngsi-row"><label class="ngsi-field">Recent messages to summarize <input class="text_pole ngsi-count" type="number" min="2" max="30" value="${Number(current.recentMessages) || 6}"></label>
               <label class="ngsi-field">Image size / resolution <input class="text_pole ngsi-resolution" value="${escapeHtml(current.resolution)}" placeholder="Model-specific, e.g. 1024x1024 or 1k"></label></div>
               <label class="ngsi-field">Optional image quality <input class="text_pole ngsi-quality" value="${escapeHtml(current.imageQuality)}" placeholder="Leave blank unless your model supports it"></label>
@@ -138,8 +142,15 @@
             setStatus(value ? 'API key saved in this browser.' : 'API key cleared from this browser.');
         });
         const update = (key, value) => { settings()[key] = value; saveSettings(); };
+        $('.ngsi-api-base').addEventListener('change', e => update('apiBase', e.target.value.trim().replace(/\/+$/, '') || defaults.apiBase));
         $('.ngsi-image-model').addEventListener('change', e => update('imageModel', e.target.value.trim()));
         $('.ngsi-text-model').addEventListener('change', e => update('textModel', e.target.value.trim()));
+        $('.ngsi-load-image-models').addEventListener('click', () => loadModels('image'));
+        $('.ngsi-load-text-models').addEventListener('click', () => loadModels('text'));
+        $('.ngsi-image-search').addEventListener('input', e => filterModelPicker('image', e.target.value));
+        $('.ngsi-text-search').addEventListener('input', e => filterModelPicker('text', e.target.value));
+        $('.ngsi-image-picker').addEventListener('change', e => { if (e.target.value) { $('.ngsi-image-model').value = e.target.value; update('imageModel', e.target.value); } });
+        $('.ngsi-text-picker').addEventListener('change', e => { if (e.target.value) { $('.ngsi-text-model').value = e.target.value; update('textModel', e.target.value); } });
         $('.ngsi-count').addEventListener('change', e => update('recentMessages', Math.max(2, Math.min(30, Number(e.target.value) || 6))));
         $('.ngsi-resolution').addEventListener('change', e => update('resolution', e.target.value.trim()));
         $('.ngsi-quality').addEventListener('change', e => update('imageQuality', e.target.value.trim()));
@@ -148,6 +159,63 @@
         $('.ngsi-add-ref').addEventListener('click', addReference);
         $('.ngsi-generate').addEventListener('click', generateAndInsert);
         refreshReferenceList();
+    }
+
+    const modelCatalogs = { image: [], text: [] };
+
+    function apiUrl(path) {
+        const base = (settings().apiBase || defaults.apiBase).trim().replace(/\/+$/, '');
+        return `${base}${path}`;
+    }
+
+    async function loadModels(kind) {
+        const key = apiKey();
+        if (!key) return setStatus('Enter and save your NanoGPT API key before loading models.', true);
+        const button = rootElement()?.querySelector(`.ngsi-load-${kind}-models`);
+        if (button) { button.disabled = true; button.textContent = 'Loading…'; }
+        try {
+            const path = kind === 'image' ? '/api/v1/image-models?detailed=true' : '/api/v1/models?detailed=true';
+            const response = await fetch(apiUrl(path), { headers: { 'Authorization': `Bearer ${key}` } });
+            const raw = await response.text();
+            let data;
+            try { data = raw ? JSON.parse(raw) : {}; } catch { data = { message: raw }; }
+            if (!response.ok) throw new Error(data?.error?.message || data?.message || `HTTP ${response.status}`);
+            const rows = Array.isArray(data.data) ? data.data : Array.isArray(data.models) ? data.models : [];
+            modelCatalogs[kind] = rows.filter(model => model?.id).map(model => ({
+                id: String(model.id),
+                name: String(model.name || model.id),
+                description: String(model.description || ''),
+                supportsImageInput: model.capabilities?.image_to_image === true || model.architecture?.input_modalities?.includes('image') === true,
+                resolutions: Array.isArray(model.supported_parameters?.resolutions) ? model.supported_parameters.resolutions : [],
+            }));
+            filterModelPicker(kind, rootElement().querySelector(`.ngsi-${kind}-search`).value);
+            setStatus(`Loaded ${modelCatalogs[kind].length} ${kind} models. Search by name or model ID and select a result.`);
+        } catch (error) {
+            setStatus(`Could not load ${kind} models: ${error.message}. You can still type a model ID manually.`, true);
+        } finally {
+            if (button) { button.disabled = false; button.textContent = `Load ${kind} models`; }
+        }
+    }
+
+    function filterModelPicker(kind, query = '') {
+        const root = rootElement();
+        const select = root?.querySelector(`.ngsi-${kind}-picker`);
+        if (!select) return;
+        const term = query.trim().toLowerCase();
+        const all = modelCatalogs[kind];
+        const matches = all.filter(model => !term || `${model.id} ${model.name} ${model.description}`.toLowerCase().includes(term)).slice(0, 100);
+        select.replaceChildren();
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = all.length ? `${matches.length} matching ${kind} models` : 'Load models to search';
+        select.append(placeholder);
+        for (const model of matches) {
+            const option = document.createElement('option');
+            option.value = model.id;
+            option.textContent = `${model.name} — ${model.id}`;
+            option.title = model.description;
+            select.append(option);
+        }
     }
 
     async function refreshReferenceList() {
@@ -311,7 +379,7 @@
             extraDirection ? `Additional user direction:\n${extraDirection}` : '',
             'Make a single coherent still image that reflects the current moment. The prompt must be suitable for image generation and avoid dialogue, plot exposition, or text rendered in the image unless requested.',
         ].filter(Boolean).join('\n\n');
-        const result = await postJson(`${API_ROOT}/chat/completions`, key, {
+        const result = await postJson(apiUrl('/api/v1/chat/completions'), key, {
             model: settings().textModel || defaults.textModel,
             messages: [{ role: 'system', content: system }, { role: 'user', content: request }],
             temperature: 0.35,
@@ -376,7 +444,7 @@
             if (settings().resolution) body.size = settings().resolution;
             if (settings().imageQuality) body.quality = settings().imageQuality;
             if (refs.length) body.imageDataUrls = refs.map(ref => ref.dataUrl);
-            const generated = await postJson('https://api.nano-gpt.com/v1/images/generations', key, body);
+            const generated = await postJson(apiUrl('/v1/images/generations'), key, body);
             const images = extractImages(generated);
             if (!images.length) throw new Error('The image endpoint returned no usable image. Try a different image model.');
             const output = images.map((src, index) => `![Generated scene ${index + 1}](${src})`).join('\n\n');
